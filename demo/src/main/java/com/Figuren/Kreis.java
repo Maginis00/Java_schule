@@ -1,0 +1,177 @@
+package com.Figuren;
+
+import java.awt.geom.*;
+
+/**
+ * Ein Kreis, der manipuliert werden kann und sich selbst auf einer Leinwand
+ * zeichnet.
+ * 
+ * @author Michael K�lling und David J. Barnes
+ * @version 2016.02.29
+ */
+
+public class Kreis {
+    private int durchmesser;
+
+    private int xPosition;
+
+    private int yPosition;
+
+    private String farbe;
+
+    private boolean istSichtbar;
+
+    /**
+     * Erzeuge einen neuen Kreis an einer Standardposition mit einer
+     * Standardfarbe.
+     */
+    public Kreis() {
+        durchmesser = 68;
+        xPosition = 230;
+        yPosition = 90;
+        farbe = "blau";
+    }
+
+    /**
+     * Mache diesen Kreis sichtbar. Wenn er bereits sichtbar ist, tue nichts.
+     */
+    public void sichtbarMachen() {
+        istSichtbar = true;
+        zeichnen();
+    }
+
+    /**
+     * Mache diesen Kreis unsichtbar. Wenn er bereits unsichtbar ist, tue
+     * nichts.
+     */
+    public void unsichtbarMachen() {
+        loeschen();
+        istSichtbar = false;
+    }
+
+    /**
+     * Bewege diesen Kreis einige Bildschirmpunkte nach rechts.
+     */
+    public void nachRechtsBewegen() {
+        horizontalBewegen(20);
+    }
+
+    /**
+     * Bewege diesen Kreis einige Bildschirmpunkte nach links.
+     */
+    public void nachLinksBewegen() {
+        horizontalBewegen(-20);
+    }
+
+    /**
+     * Bewege diesen Kreis einige Bildschirmpunkte nach oben.
+     */
+    public void nachObenBewegen() {
+        vertikalBewegen(-20);
+    }
+
+    /**
+     * Bewege diesen Kreis einige Bildschirmpunkte nach unten.
+     */
+    public void nachUntenBewegen() {
+        vertikalBewegen(20);
+    }
+
+    /**
+     * Bewege diesen Kreis horizontal um 'entfernung' Bildschirmpunkte.
+     */
+    public void horizontalBewegen(int entfernung) {
+        loeschen();
+        xPosition += entfernung;
+        zeichnen();
+    }
+
+    /**
+     * Bewege diesen Kreis vertikal um 'entfernung' Bildschirmpunkte.
+     */
+    public void vertikalBewegen(int entfernung) {
+        loeschen();
+        yPosition += entfernung;
+        zeichnen();
+    }
+
+    /**
+     * Bewege diesen Kreis langsam horizontal um 'entfernung' Bildschirmpunkte.
+     */
+    public void langsamHorizontalBewegen(int entfernung) {
+        int delta;
+
+        if (entfernung < 0) {
+            delta = -1;
+            entfernung = -entfernung;
+        } else {
+            delta = 1;
+        }
+
+        for (int i = 0; i < entfernung; i++) {
+            xPosition += delta;
+            zeichnen();
+        }
+    }
+
+    /**
+     * Bewege diesen Kreis langsam vertikal um 'entfernung' Bildschirmpunkte.
+     */
+    public void langsamVertikalBewegen(int entfernung) {
+        int delta;
+
+        if (entfernung < 0) {
+            delta = -1;
+            entfernung = -entfernung;
+        } else {
+            delta = 1;
+        }
+
+        for (int i = 0; i < entfernung; i++) {
+            yPosition += delta;
+            zeichnen();
+        }
+    }
+
+    /**
+     * �ndere den Durchmesser dieses Kreises in 'neuerDurchmesser' (Angabe in
+     * Bildschirmpunkten). 'neuerDurchmesser' muss gr��er gleich null sein.
+     */
+    public void groesseAendern(int neuerDurchmesser) {
+        loeschen();
+        durchmesser = neuerDurchmesser;
+        zeichnen();
+    }
+
+    /**
+     * �ndere die Farbe dieses Kreises in 'neueFarbe'. G�ltige Angaben sind
+     * "rot", "gelb", "blau", "gruen", "lila" und "schwarz".
+     */
+    public void farbeAendern(String neueFarbe) {
+        farbe = neueFarbe;
+        zeichnen();
+    }
+
+    /**
+     * Zeichne diesen Kreis mit seinen aktuellen Werten auf den Bildschirm.
+     */
+    private void zeichnen() {
+        if (istSichtbar) {
+            Leinwand leinwand = Leinwand.gibLeinwand();
+            leinwand.zeichne(this, farbe, new Ellipse2D.Double(xPosition,
+                    yPosition, durchmesser, durchmesser));
+            leinwand.warte(10);
+        }
+    }
+
+    /**
+     * L�sche diesen Kreis vom Bildschirm.
+     */
+    private void loeschen() {
+        if (istSichtbar) {
+            Leinwand leinwand = Leinwand.gibLeinwand();
+            leinwand.entferne(this);
+        }
+    }
+
+}
