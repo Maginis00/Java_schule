@@ -1,4 +1,4 @@
-package com.figuren;
+package com.Figuren;
 
 import java.awt.Polygon;
 import java.awt.Shape;

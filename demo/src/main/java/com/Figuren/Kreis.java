@@ -1,4 +1,4 @@
-package com.figuren;
+package com.Figuren;
 
 import java.awt.Shape;
 import java.awt.geom.Ellipse2D;

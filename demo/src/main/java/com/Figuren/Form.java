@@ -1,9 +1,8 @@
-package com.figuren;
+package com.Figuren;
 
 import java.awt.Shape;
 
-import com.figuren.leinwand.Leinwand;
-
+import com.Figuren.leinwand.Leinwand;
 /**
  * Gemeinsame Basis aller Figuren: Position, Farbe, Sichtbarkeit und Bewegung.
  * Die konkrete Geometrie bleibt in den Unterklassen.

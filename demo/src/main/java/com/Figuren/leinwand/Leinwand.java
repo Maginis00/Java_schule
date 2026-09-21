@@ -1,4 +1,4 @@
-package com.figuren.leinwand;
+package com.Figuren.leinwand;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -37,7 +37,8 @@ public class Leinwand {
             "gelb", new Color(255, 230, 0),
             "gruen", new Color(80, 160, 60),
             "lila", Color.magenta,
-            "weiss", Color.white
+            "weiss", Color.white,
+            "orange", Color.ORANGE
     );
 
     private static Leinwand leinwandSingleton;
