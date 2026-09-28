@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
-import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -16,11 +15,22 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
 import java.util.Arrays;
 
-/** Fenster, Canvas, Game Loop, Input, Update und Render an einem Ort. */
-class Game {
+import com.example.component.PlayerTag;
+import com.example.component.Renderable;
+import com.example.component.Transform;
+import com.example.component.Velocity;
+import com.example.ecs.Schedule;
+import com.example.ecs.World;
+import com.example.system.DebugSystem;
+import com.example.system.InputSystem;
+import com.example.system.MovementSystem;
+import com.example.system.RenderSystem;
+
+/** Fenster, Canvas, Loop und Keyboard-State; die Spiellogik steckt komplett in den Systems. */
+public class Game {
     private static final int WIDTH = 800;
     private static final int HEIGHT = 600;
-    private static final String TITLE = "AWT Game Loop";
+    private static final String TITLE = "AWT ECS";
 
     private static final int TARGET_UPS = 60;
     private static final double DT = 1.0 / TARGET_UPS;      // feste Schrittweite in Sekunden
@@ -30,27 +40,74 @@ class Game {
     private static final int BUFFER_STRATEGY_RETRIES = 10;
     private static final long RETRY_DELAY_MS = 10;
 
-    private static final Color BACKGROUND = new Color(30, 40, 60);
+    private static final double PLAYER_SIZE = 40;
     private static final Color PLAYER_COLOR = new Color(80, 200, 120);
     private static final Color OBSTACLE_COLOR = new Color(200, 80, 80);
-    private static final Color TEXT_COLOR = Color.WHITE;
-    private static final Rectangle OBSTACLE = new Rectangle(500, 200, 120, 120);
-    private static final int TEXT_X = 10;
-    private static final int TEXT_Y = 20;
 
-    private final boolean[] keys = new boolean[256];
+    /** Resource: gedrückte Tasten. Wird vom Canvas-Listener geschrieben, vom InputSystem gelesen. */
+    public static final class KeyState {
+        private final boolean[] keys = new boolean[256];
+
+        public boolean isDown(int keyCode) {
+            return keyCode >= 0 && keyCode < keys.length && keys[keyCode];
+        }
+
+        void set(int keyCode, boolean down) {
+            if (keyCode >= 0 && keyCode < keys.length) {
+                keys[keyCode] = down;
+            }
+        }
+
+        void clear() {
+            Arrays.fill(keys, false);
+        }
+    }
+
+    /** Resource: aktuelle Zeichenfläche des Frames plus Debug-Werte für das DebugSystem. */
+    public static final class RenderTarget {
+        private final int width;
+        private final int height;
+        private Graphics graphics;
+        private int fps;
+        private int ups;
+
+        RenderTarget(int width, int height) {
+            this.width = width;
+            this.height = height;
+        }
+
+        public Graphics getGraphics() {
+            return graphics;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getFps() {
+            return fps;
+        }
+
+        public int getUps() {
+            return ups;
+        }
+    }
+
+    private final KeyState keyState = new KeyState();
+    private final RenderTarget renderTarget = new RenderTarget(WIDTH, HEIGHT);
+    private final World world = new World();
+    private final Schedule schedule = new Schedule();
     private volatile boolean running;
 
     private Frame frame;
     private Canvas canvas;
     private BufferStrategy bufferStrategy;
-    private Player player;
 
-    // Debug-Anzeige, wird einmal pro Sekunde aktualisiert
-    private int fps;
-    private int ups;
-
-    void start() {
+    public void start() {
         init();
         running = true;
         loop();
@@ -59,8 +116,33 @@ class Game {
     }
 
     private void init() {
-        player = new Player((WIDTH - Player.SIZE) / 2.0, (HEIGHT - Player.SIZE) / 2.0);
+        initWorld();
+        initWindow();
+    }
 
+    /** Resources, Systems in fester Set-Zuordnung und die Start-Entities anlegen. */
+    private void initWorld() {
+        world.setResource(KeyState.class, keyState);
+        world.setResource(RenderTarget.class, renderTarget);
+
+        // Innerhalb eines Sets gilt die Einfügereihenfolge
+        schedule.inputSet().add(new InputSystem());
+        schedule.updateSet().add(new MovementSystem(WIDTH, HEIGHT));
+        schedule.renderSet().add(new RenderSystem()).add(new DebugSystem());
+
+        // Hindernis zuerst, damit der Player (höhere ID) darüber gezeichnet wird
+        int obstacle = world.createEntity();
+        world.add(obstacle, new Transform(500, 200));
+        world.add(obstacle, new Renderable(120, 120, OBSTACLE_COLOR));
+
+        int player = world.createEntity();
+        world.add(player, new Transform((WIDTH - PLAYER_SIZE) / 2.0, (HEIGHT - PLAYER_SIZE) / 2.0));
+        world.add(player, new Velocity(0, 0));
+        world.add(player, new Renderable(PLAYER_SIZE, PLAYER_SIZE, PLAYER_COLOR));
+        world.add(player, new PlayerTag());
+    }
+
+    private void initWindow() {
         canvas = new Canvas();
         canvas.setPreferredSize(new Dimension(WIDTH, HEIGHT));
         canvas.setIgnoreRepaint(true); // Wir zeichnen aktiv selbst, AWT soll nicht dazwischenfunken
@@ -68,19 +150,19 @@ class Game {
         canvas.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                setKey(e.getKeyCode(), true);
+                keyState.set(e.getKeyCode(), true);
             }
 
             @Override
             public void keyReleased(KeyEvent e) {
-                setKey(e.getKeyCode(), false);
+                keyState.set(e.getKeyCode(), false);
             }
         });
         // Bei Fokusverlust alle Tasten loslassen, sonst "klemmt" die Bewegung
         canvas.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
-                Arrays.fill(keys, false);
+                keyState.clear();
             }
         });
 
@@ -100,28 +182,20 @@ class Game {
         canvas.requestFocus();
     }
 
-    private void setKey(int code, boolean down) {
-        if (code >= 0 && code < keys.length) {
-            keys[code] = down;
-        }
-    }
-
     /** Fixed-Timestep-Loop mit Akkumulator: Update in festen Schritten, Render so oft es geht. */
     private void loop() {
-        long previous = System.nanoTime();
+        long previous = java.lang.System.nanoTime();
         long counterStart = previous;
         double accumulator = 0;
         int frameCount = 0;
         int updateCount = 0;
 
         while (running) {
-            long now = System.nanoTime();
+            long now = java.lang.System.nanoTime();
             double frameTime = (now - previous) / NANOS_PER_SECOND;
             previous = now;
             // Nach einem langen Hänger nicht endlos nachholen
             accumulator += Math.min(frameTime, MAX_FRAME_TIME);
-
-            handleInput();
 
             // Verstrichene Zeit in feste Logik-Schritte umsetzen
             while (accumulator >= DT) {
@@ -130,12 +204,13 @@ class Game {
                 updateCount++;
             }
 
-            renderFrame();
+            // Restzeit im Akkumulator / DT = Interpolationsfaktor (0..1) für das Rendering
+            renderFrame(accumulator / DT);
             frameCount++;
 
             if (now - counterStart >= NANOS_PER_SECOND) {
-                fps = frameCount;
-                ups = updateCount;
+                renderTarget.fps = frameCount;
+                renderTarget.ups = updateCount;
                 frameCount = 0;
                 updateCount = 0;
                 counterStart = now;
@@ -151,22 +226,12 @@ class Game {
         }
     }
 
-    private void handleInput() {
-        int dx = 0;
-        int dy = 0;
-        if (keys[KeyEvent.VK_LEFT] || keys[KeyEvent.VK_A]) dx--;
-        if (keys[KeyEvent.VK_RIGHT] || keys[KeyEvent.VK_D]) dx++;
-        if (keys[KeyEvent.VK_UP] || keys[KeyEvent.VK_W]) dy--;
-        if (keys[KeyEvent.VK_DOWN] || keys[KeyEvent.VK_S]) dy++;
-        player.setDirection(dx, dy);
-    }
-
-    /** Reine Logik, unabhängig vom Zeichnen; dt ist immer die feste Schrittweite. */
+    /** Logik-Pfad: InputSet und UpdateSet, nie im Render-Pfad. */
     private void update(double dt) {
-        player.update(dt, WIDTH, HEIGHT, OBSTACLE);
+        schedule.update(world, dt);
     }
 
-    private void renderFrame() {
+    private void renderFrame(double alpha) {
         if (bufferStrategy == null) {
             bufferStrategy = obtainBufferStrategy();
             if (bufferStrategy == null) {
@@ -178,7 +243,7 @@ class Game {
             do {
                 Graphics g = bufferStrategy.getDrawGraphics();
                 try {
-                    render(g);
+                    render(g, alpha);
                 } finally {
                     g.dispose();
                 }
@@ -186,6 +251,13 @@ class Game {
             bufferStrategy.show();
         } while (bufferStrategy.contentsLost());
         Toolkit.getDefaultToolkit().sync();
+    }
+
+    /** Render-Pfad: nur das RenderSet, zeichnet auf den Graphics des aktuellen Buffers. */
+    private void render(Graphics g, double alpha) {
+        renderTarget.graphics = g;
+        schedule.render(world, alpha);
+        renderTarget.graphics = null;
     }
 
     /** Erzeugt die BufferStrategy; schlägt fehl, solange das Fenster nicht angezeigt wird -> kurz retryn. */
@@ -208,20 +280,5 @@ class Game {
             }
         }
         return null;
-    }
-
-    private void render(Graphics g) {
-        g.setColor(BACKGROUND);
-        g.fillRect(0, 0, WIDTH, HEIGHT);
-
-        g.setColor(OBSTACLE_COLOR);
-        g.fillRect(OBSTACLE.x, OBSTACLE.y, OBSTACLE.width, OBSTACLE.height);
-
-        Rectangle p = player.getBounds();
-        g.setColor(PLAYER_COLOR);
-        g.fillRect(p.x, p.y, p.width, p.height);
-
-        g.setColor(TEXT_COLOR);
-        g.drawString("FPS: " + fps + "  UPS: " + ups, TEXT_X, TEXT_Y);
     }
 }
