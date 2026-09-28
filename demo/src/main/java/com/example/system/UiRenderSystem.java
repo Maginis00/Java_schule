@@ -1,61 +1,123 @@
 package com.example.system;
 
 import com.example.Game.RenderTarget;
-import com.example.component.UiButton;
 import com.example.ecs.System;
 import com.example.ecs.World;
+import com.example.figurenadapter.FormFactory;
+import com.example.resource.SpawnMode;
+import com.example.resource.UiMenuState;
+import com.example.ui.FormMenuItem;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.geom.AffineTransform;
+import java.util.List;
 
-/** Zeichnet den Dreiecks-Knopf mit Beschriftung; läuft nach der Welt, damit die UI oben liegt. */
+/** Zeichnet das Form-Menü über der Welt: Anker immer, das Dropdown nur wenn geöffnet. */
 public class UiRenderSystem implements System {
-    private static final float NORMAL_STROKE = 1.5f;
-    private static final float ACTIVE_STROKE = 3.5f;
-    private static final Color NORMAL_OUTLINE = new Color(20, 30, 50);
-    private static final Color ACTIVE_OUTLINE = Color.WHITE;
-    private static final double MAX_GLOW_MIX = 0.5;  // wie weit die Füllung Richtung Weiß pulsiert
-    private static final int LABEL_GAP = 10;
-    private static final int LABEL_BASELINE_OFFSET = 5;
-    private static final Color LABEL_COLOR = Color.WHITE;
+    private static final String ANCHOR_CLOSED = "Form>";
+    private static final String ANCHOR_OPEN = "Form v";
+
+    private static final Color ANCHOR_COLOR = new Color(50, 60, 85);
+    private static final Color ANCHOR_HOVER_COLOR = new Color(75, 90, 125);
+    private static final Color PANEL_COLOR = new Color(40, 48, 68);
+    private static final Color ITEM_HOVER_COLOR = new Color(85, 105, 150);
+    private static final Color BORDER_COLOR = new Color(20, 25, 40);
+    private static final Color SEPARATOR_COLOR = new Color(70, 80, 105);
+    private static final Color TEXT_COLOR = Color.WHITE;
+    private static final Color ACTIVE_COLOR = new Color(255, 200, 60); // aktives Spawn-Werkzeug
+    private static final Color PREVIEW_COLOR = new Color(140, 190, 240);
+
+    private static final int TEXT_PADDING = 10;
+    private static final int PREVIEW_PADDING = 18;   // Abstand linker Rand -> Preview-Mitte
+    private static final int LABEL_X_OFFSET = 38;    // Abstand linker Rand -> Text im Eintrag
+    private static final int ACTIVE_BAR_WIDTH = 4;
+    private static final int SELECTION_GAP = 12;
 
     @Override
     public void update(World world, double alpha) {
         Graphics2D g2 = (Graphics2D) world.getResource(RenderTarget.class).getGraphics();
+        UiMenuState menu = world.getResource(UiMenuState.class);
+        SpawnMode spawn = world.getResource(SpawnMode.class);
+        Font bold = g2.getFont().deriveFont(Font.BOLD);
+        Font plain = g2.getFont();
 
-        for (int id : world.query(UiButton.class)) {
-            UiButton b = world.get(id, UiButton.class);
-
-            g2.setColor(fillColor(b));
-            g2.fill(b.polygon);
-
-            g2.setStroke(new BasicStroke(b.active ? ACTIVE_STROKE : NORMAL_STROKE));
-            g2.setColor(b.active ? ACTIVE_OUTLINE : NORMAL_OUTLINE);
-            g2.draw(b.polygon);
-
-            Rectangle bounds = b.polygon.getBounds();
-            g2.setColor(LABEL_COLOR);
-            g2.drawString(b.name, bounds.x + bounds.width + LABEL_GAP,
-                    bounds.y + bounds.height / 2 + LABEL_BASELINE_OFFSET);
+        drawAnchor(g2, menu, spawn, plain, bold);
+        if (menu.isFormMenuOpen()) {
+            drawDropdown(g2, menu, spawn, plain, bold);
         }
     }
 
-    private Color fillColor(UiButton b) {
-        if (b.active) {
-            return mixWithWhite(b.activeColor, b.glow * MAX_GLOW_MIX);
-        }
-        if (b.armed) {
-            return b.hoverColor.darker(); // gedrückt
-        }
-        return b.hovered ? b.hoverColor : b.normalColor;
+    private void drawAnchor(Graphics2D g2, UiMenuState menu, SpawnMode spawn, Font plain, Font bold) {
+        Rectangle a = menu.getAnchorBounds();
+        g2.setColor(menu.isAnchorHovered() || menu.isFormMenuOpen() ? ANCHOR_HOVER_COLOR : ANCHOR_COLOR);
+        g2.fill(a);
+        g2.setColor(BORDER_COLOR);
+        g2.draw(a);
+
+        g2.setFont(plain);
+        g2.setColor(TEXT_COLOR);
+        g2.drawString(menu.isFormMenuOpen() ? ANCHOR_OPEN : ANCHOR_CLOSED, a.x + TEXT_PADDING, baseline(g2, a));
+
+        // Aktuelle Auswahl klein daneben; fett + Akzentfarbe, solange der Spawn-Modus aktiv ist
+        String selection = FormFactory.label(spawn.getSelectedForm());
+        g2.setFont(spawn.isEnabled() ? bold : plain);
+        g2.setColor(spawn.isEnabled() ? ACTIVE_COLOR : TEXT_COLOR);
+        g2.drawString(selection, a.x + a.width + SELECTION_GAP, baseline(g2, a));
+        g2.setFont(plain);
     }
 
-    private static Color mixWithWhite(Color c, double amount) {
-        int r = (int) Math.round(c.getRed() + (255 - c.getRed()) * amount);
-        int g = (int) Math.round(c.getGreen() + (255 - c.getGreen()) * amount);
-        int bl = (int) Math.round(c.getBlue() + (255 - c.getBlue()) * amount);
-        return new Color(r, g, bl);
+    private void drawDropdown(Graphics2D g2, UiMenuState menu, SpawnMode spawn, Font plain, Font bold) {
+        Rectangle d = menu.getDropdownBounds();
+        g2.setColor(PANEL_COLOR);
+        g2.fill(d);
+
+        List<FormMenuItem> items = menu.getItems();
+        for (int i = 0; i < items.size(); i++) {
+            FormMenuItem item = items.get(i);
+            Rectangle b = item.bounds;
+            boolean selected = i == menu.getSelectedIndex();
+            boolean activeTool = selected && spawn.isEnabled();
+
+            // Hover hellt genau diesen Eintrag auf
+            if (i == menu.getHoveredIndex()) {
+                g2.setColor(ITEM_HOVER_COLOR);
+                g2.fill(b);
+            }
+            // Linker Farbbalken markiert das aktive Spawn-Werkzeug
+            if (activeTool) {
+                g2.setColor(ACTIVE_COLOR);
+                g2.fillRect(b.x, b.y, ACTIVE_BAR_WIDTH, b.height);
+            }
+
+            // Preview links: dieselbe Shape-Erzeugung wie in der Welt, nur klein skaliert
+            AffineTransform old = g2.getTransform();
+            g2.translate(b.x + PREVIEW_PADDING, b.getCenterY());
+            g2.setColor(PREVIEW_COLOR);
+            g2.fill(item.previewShape);
+            g2.setTransform(old);
+
+            g2.setFont(activeTool ? bold : plain);
+            g2.setColor(TEXT_COLOR);
+            g2.drawString(item.label, b.x + LABEL_X_OFFSET, baseline(g2, b));
+
+            // Trennlinie zwischen den Einträgen
+            if (i < items.size() - 1) {
+                g2.setColor(SEPARATOR_COLOR);
+                g2.drawLine(b.x, b.y + b.height - 1, b.x + b.width, b.y + b.height - 1);
+            }
+        }
+        g2.setFont(plain);
+        g2.setColor(BORDER_COLOR);
+        g2.draw(d);
+    }
+
+    /** Baseline, damit der Text im Rechteck vertikal mittig sitzt. */
+    private int baseline(Graphics2D g2, Rectangle r) {
+        FontMetrics fm = g2.getFontMetrics();
+        return r.y + (r.height + fm.getAscent() - fm.getDescent()) / 2;
     }
 }

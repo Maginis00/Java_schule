@@ -27,16 +27,15 @@ import com.example.ecs.World;
 import com.example.input.KeyState;
 import com.example.input.MouseState;
 import com.example.resource.SpawnMode;
-import com.example.system.ButtonVisualSystem;
 import com.example.system.DebugSystem;
 import com.example.system.InputSystem;
 import com.example.system.MovementSystem;
 import com.example.system.RenderSystem;
 import com.example.system.ShapeRenderSystem;
-import com.example.system.UiInputSystem;
+import com.example.system.UiMenuInputSystem;
 import com.example.system.UiRenderSystem;
 import com.example.system.WorldInputSystem;
-import com.example.ui.TriangleButtonFactory;
+import com.example.ui.FormMenuFactory;
 
 /** Fenster, Canvas, Loop und Keyboard-State; die Spiellogik steckt komplett in den Systems. */
 public class Game {
@@ -124,17 +123,19 @@ public class Game {
 
         // Sets laufen fest als Input -> Update -> Render, innerhalb eines Sets gilt die Einfügereihenfolge.
         // Im InputSet zuerst die UI (verbraucht Klicks), zuletzt die Welt (löscht die Klick-Flags).
-        schedule.inputSet().add(new UiInputSystem()).add(new InputSystem()).add(new WorldInputSystem());
-        schedule.updateSet().add(new MovementSystem(WIDTH, HEIGHT)).add(new ButtonVisualSystem());
-        schedule.renderSet().add(new RenderSystem()).add(new ShapeRenderSystem())
-                .add(new UiRenderSystem()).add(new DebugSystem());
+        schedule.inputSet()
+            .add(new UiMenuInputSystem())
+            .add(new InputSystem())
+            .add(new WorldInputSystem());
+        schedule.updateSet()
+            .add(new MovementSystem(WIDTH, HEIGHT));
+        schedule.renderSet()
+            .add(new RenderSystem())
+            .add(new ShapeRenderSystem())
+            .add(new UiRenderSystem())
+            .add(new DebugSystem());
 
-        TriangleButtonFactory.create(world);
-
-        // Hindernis zuerst, damit der Player (höhere ID) darüber gezeichnet wird
-        int obstacle = world.createEntity();
-        world.add(obstacle, new Transform(500, 200));
-        world.add(obstacle, new Renderable(120, 120, OBSTACLE_COLOR));
+        FormMenuFactory.create(world); // legt auch die UiMenuState-Resource an
 
         int player = world.createEntity();
         world.add(player, new Transform((WIDTH - PLAYER_SIZE) / 2.0, (HEIGHT - PLAYER_SIZE) / 2.0));
