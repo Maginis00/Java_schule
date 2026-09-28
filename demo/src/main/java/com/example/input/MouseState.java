@@ -12,10 +12,13 @@ import java.awt.event.MouseEvent;
  * nicht verloren, wenn in einem Render-Frame mal kein Update-Schritt läuft.
  */
 public class MouseState {
+    private static final int DOUBLE_CLICK_COUNT = 2;
+
     private int x;
     private int y;
     private boolean leftPressed;
     private boolean leftClickedThisFrame;
+    private boolean leftDoubleClickedThisFrame;
     private boolean rightClickedThisFrame;
     private boolean insideWindow;
 
@@ -30,10 +33,17 @@ public class MouseState {
         this.insideWindow = insideWindow;
     }
 
-    public synchronized void press(int button) {
+    public void press(int button) {
+        press(button, 1);
+    }
+
+    /** clickCount kommt von AWT: 2 beim zweiten Klick innerhalb der Doppelklick-Zeit. */
+    public synchronized void press(int button, int clickCount) {
         if (button == MouseEvent.BUTTON1) {
             leftPressed = true;
             leftClickedThisFrame = true;
+            // Genau der zweite Klick zählt als Doppelklick, ein dritter blättert wieder normal weiter
+            leftDoubleClickedThisFrame = clickCount == DOUBLE_CLICK_COUNT;
         } else if (button == MouseEvent.BUTTON3) {
             rightClickedThisFrame = true;
         }
@@ -48,8 +58,7 @@ public class MouseState {
     /** Bei Fokusverlust: nichts darf "hängen" bleiben. */
     public synchronized void clear() {
         leftPressed = false;
-        leftClickedThisFrame = false;
-        rightClickedThisFrame = false;
+        endFrame();
     }
 
     // --- Leseseite (Systems) ---
@@ -70,6 +79,11 @@ public class MouseState {
         return leftClickedThisFrame;
     }
 
+    /** Der aktuelle Linksklick war der zweite einer Doppelklick-Folge. */
+    public synchronized boolean isLeftDoubleClickedThisFrame() {
+        return leftClickedThisFrame && leftDoubleClickedThisFrame;
+    }
+
     public synchronized boolean isRightClickedThisFrame() {
         return rightClickedThisFrame;
     }
@@ -81,6 +95,7 @@ public class MouseState {
     /** Markiert den Linksklick als verbraucht; spätere Systems sehen ihn nicht mehr. */
     public synchronized void consumeLeftClick() {
         leftClickedThisFrame = false;
+        leftDoubleClickedThisFrame = false;
     }
 
     public synchronized void consumeRightClick() {
@@ -90,6 +105,7 @@ public class MouseState {
     /** Am Ende des InputSets: alle noch offenen Klicks verwerfen. */
     public synchronized void endFrame() {
         leftClickedThisFrame = false;
+        leftDoubleClickedThisFrame = false;
         rightClickedThisFrame = false;
     }
 }

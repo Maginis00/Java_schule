@@ -11,16 +11,20 @@ public class UiMenuState {
 
     private final Rectangle anchorBounds;
     private final Rectangle dropdownBounds;
+    private final Rectangle settingsButtonBounds;
     private final List<FormMenuItem> items;
 
     private boolean formMenuOpen;
     private boolean anchorHovered;
+    private boolean settingsHovered;
     private int hoveredIndex = NO_ITEM;
     private int selectedIndex;
 
-    public UiMenuState(Rectangle anchorBounds, Rectangle dropdownBounds, List<FormMenuItem> items) {
+    public UiMenuState(Rectangle anchorBounds, Rectangle dropdownBounds, Rectangle settingsButtonBounds,
+            List<FormMenuItem> items) {
         this.anchorBounds = anchorBounds;
         this.dropdownBounds = dropdownBounds;
+        this.settingsButtonBounds = settingsButtonBounds;
         this.items = items;
     }
 
@@ -30,6 +34,18 @@ public class UiMenuState {
 
     public Rectangle getDropdownBounds() {
         return dropdownBounds;
+    }
+
+    public Rectangle getSettingsButtonBounds() {
+        return settingsButtonBounds;
+    }
+
+    public boolean isSettingsHovered() {
+        return settingsHovered;
+    }
+
+    public void setSettingsHovered(boolean settingsHovered) {
+        this.settingsHovered = settingsHovered;
     }
 
     public List<FormMenuItem> getItems() {

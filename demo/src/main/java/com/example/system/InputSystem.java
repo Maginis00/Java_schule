@@ -34,5 +34,8 @@ public class InputSystem implements System {
             v.vx = vx;
             v.vy = vy;
         }
+
+        // Letztes System im InputSet: nicht verbrauchte Tastendrücke verwerfen
+        keys.endFrame();
     }
 }

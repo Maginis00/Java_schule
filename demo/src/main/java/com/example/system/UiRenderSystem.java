@@ -20,6 +20,7 @@ import java.util.List;
 public class UiRenderSystem implements System {
     private static final String ANCHOR_CLOSED = "Form>";
     private static final String ANCHOR_OPEN = "Form v";
+    private static final String SETTINGS_LABEL = "Einstellungen";
 
     private static final Color ANCHOR_COLOR = new Color(50, 60, 85);
     private static final Color ANCHOR_HOVER_COLOR = new Color(75, 90, 125);
@@ -29,6 +30,8 @@ public class UiRenderSystem implements System {
     private static final Color SEPARATOR_COLOR = new Color(70, 80, 105);
     private static final Color TEXT_COLOR = Color.WHITE;
     private static final Color ACTIVE_COLOR = new Color(255, 200, 60); // aktives Spawn-Werkzeug
+    private static final Color DISABLED_COLOR = new Color(38, 44, 60);
+    private static final Color DISABLED_TEXT_COLOR = new Color(110, 118, 140);
     private static final Color PREVIEW_COLOR = new Color(140, 190, 240);
 
     private static final int TEXT_PADDING = 10;
@@ -46,6 +49,7 @@ public class UiRenderSystem implements System {
         Font plain = g2.getFont();
 
         drawAnchor(g2, menu, spawn, plain, bold);
+        drawSettingsButton(g2, menu, spawn, plain);
         if (menu.isFormMenuOpen()) {
             drawDropdown(g2, menu, spawn, plain, bold);
         }
@@ -68,6 +72,19 @@ public class UiRenderSystem implements System {
         g2.setColor(spawn.isEnabled() ? ACTIVE_COLOR : TEXT_COLOR);
         g2.drawString(selection, a.x + a.width + SELECTION_GAP, baseline(g2, a));
         g2.setFont(plain);
+    }
+
+    /** "Einstellungen" neben der Auswahl; nur bedienbar (hell), solange der Spawn-Modus aktiv ist. */
+    private void drawSettingsButton(Graphics2D g2, UiMenuState menu, SpawnMode spawn, Font plain) {
+        Rectangle r = menu.getSettingsButtonBounds();
+        boolean enabled = spawn.isEnabled();
+        g2.setColor(enabled ? (menu.isSettingsHovered() ? ANCHOR_HOVER_COLOR : ANCHOR_COLOR) : DISABLED_COLOR);
+        g2.fill(r);
+        g2.setColor(BORDER_COLOR);
+        g2.draw(r);
+        g2.setFont(plain);
+        g2.setColor(enabled ? TEXT_COLOR : DISABLED_TEXT_COLOR);
+        g2.drawString(SETTINGS_LABEL, r.x + TEXT_PADDING, baseline(g2, r));
     }
 
     private void drawDropdown(Graphics2D g2, UiMenuState menu, SpawnMode spawn, Font plain, Font bold) {

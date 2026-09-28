@@ -26,15 +26,22 @@ import com.example.ecs.Schedule;
 import com.example.ecs.World;
 import com.example.input.KeyState;
 import com.example.input.MouseState;
+import com.example.resource.PropertyDialog;
+import com.example.resource.Selection;
 import com.example.resource.SpawnMode;
 import com.example.system.DebugSystem;
+import com.example.system.DialogRenderSystem;
 import com.example.system.InputSystem;
 import com.example.system.MovementSystem;
+import com.example.system.OverlayRenderSystem;
 import com.example.system.RenderSystem;
+import com.example.system.SelectionHighlightSystem;
 import com.example.system.ShapeRenderSystem;
+import com.example.system.UiDialogInputSystem;
 import com.example.system.UiMenuInputSystem;
 import com.example.system.UiRenderSystem;
-import com.example.system.WorldInputSystem;
+import com.example.system.WorldPickSystem;
+import com.example.system.WorldSpawnSystem;
 import com.example.ui.FormMenuFactory;
 
 /** Fenster, Canvas, Loop und Keyboard-State; die Spiellogik steckt komplett in den Systems. */
@@ -119,20 +126,28 @@ public class Game {
         world.setResource(KeyState.class, keyState);
         world.setResource(MouseState.class, mouseState);
         world.setResource(SpawnMode.class, spawnMode);
+        world.setResource(Selection.class, new Selection());
+        world.setResource(PropertyDialog.class, new PropertyDialog());
         world.setResource(RenderTarget.class, renderTarget);
 
         // Sets laufen fest als Input -> Update -> Render, innerhalb eines Sets gilt die Einfügereihenfolge.
-        // Im InputSet zuerst die UI (verbraucht Klicks), zuletzt die Welt (löscht die Klick-Flags).
+        // Im InputSet zuerst die UI (Dialog vor Menü, beide verbrauchen Klicks), dann die Welt:
+        // Pick (Selektion) vor Spawn, der die Klick-Flags am Ende löscht. Der Player-Input ist ganz am Ende.
         schedule.inputSet()
+            .add(new UiDialogInputSystem())
             .add(new UiMenuInputSystem())
-            .add(new InputSystem())
-            .add(new WorldInputSystem());
+            .add(new WorldPickSystem())
+            .add(new WorldSpawnSystem())
+            .add(new InputSystem());
         schedule.updateSet()
             .add(new MovementSystem(WIDTH, HEIGHT));
         schedule.renderSet()
             .add(new RenderSystem())
             .add(new ShapeRenderSystem())
+            .add(new SelectionHighlightSystem())
             .add(new UiRenderSystem())
+            .add(new DialogRenderSystem())
+            .add(new OverlayRenderSystem())
             .add(new DebugSystem());
 
         FormMenuFactory.create(world); // legt auch die UiMenuState-Resource an
@@ -165,7 +180,7 @@ public class Game {
             public void mousePressed(MouseEvent e) {
                 canvas.requestFocusInWindow();
                 mouseState.setPosition(e.getX(), e.getY());
-                mouseState.press(e.getButton());
+                mouseState.press(e.getButton(), e.getClickCount());
             }
 
             @Override

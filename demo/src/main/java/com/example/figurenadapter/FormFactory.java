@@ -6,6 +6,7 @@ import com.Figuren.Kreis;
 import com.Figuren.Person;
 import com.Figuren.Quadrat;
 import com.Figuren.Rechteck;
+import com.example.component.Style;
 import com.example.component.Transform;
 
 import java.awt.Shape;
@@ -67,18 +68,41 @@ public final class FormFactory {
         return entry(formId).supplier.get();
     }
 
-    /**
-     * Shape der Figur, mit ihrem Mittelpunkt auf dem Transform. Die Figuren tragen eine eigene
-     * Standardposition und haben keinen öffentlichen Setter; deshalb wird die Shape aus
-     * erzeugeShape() nur verschoben, die Figur bleibt unverändert. Menü-Preview und
-     * Welt-Zeichnung nutzen genau diese Methode.
-     */
+    /** Natürliche Größe der Figur: längste Seite ihrer Bounding-Box in Pixeln. */
+    public static float naturalSize(Form figur) {
+        Rectangle2D bounds = figur.erzeugeShape().getBounds2D();
+        return (float) Math.max(bounds.getWidth(), bounds.getHeight());
+    }
+
+    /** Standardstil einer Form: Standardfarbe, natürliche Größe. */
+    public static Style defaultStyle(String formId) {
+        return Style.defaults(naturalSize(create(formId)));
+    }
+
+    /** Shape in natürlicher Größe, Mittelpunkt auf dem Transform (Menü-Preview). */
     public static Shape toShape(Form figur, Transform t) {
+        return toShape(figur, t, 0);
+    }
+
+    /**
+     * Shape der Figur an Position und Größe. Die Figuren tragen eine eigene Standardposition und
+     * -größe und haben keine öffentlichen Setter; deshalb wird die Shape aus erzeugeShape() nur
+     * transformiert (Mittelpunkt -> Ursprung, skalieren, auf den Transform schieben) und die
+     * Figur bleibt unverändert. Menü-Preview, Zeichnen und Hit-Test nutzen genau diese Methode,
+     * darum trifft ein Klick immer die Fläche, die man sieht.
+     * size <= 0 bedeutet natürliche Größe.
+     */
+    public static Shape toShape(Form figur, Transform t, double size) {
         Shape local = figur.erzeugeShape();
         Rectangle2D bounds = local.getBounds2D();
-        AffineTransform move = AffineTransform.getTranslateInstance(
-                t.x - bounds.getCenterX(), t.y - bounds.getCenterY());
-        return move.createTransformedShape(local);
+        double base = Math.max(bounds.getWidth(), bounds.getHeight());
+        double scale = size > 0 && base > 0 ? size / base : 1.0;
+
+        AffineTransform at = new AffineTransform();
+        at.translate(t.x, t.y);
+        at.scale(scale, scale);
+        at.translate(-bounds.getCenterX(), -bounds.getCenterY());
+        return at.createTransformedShape(local);
     }
 
     private static Entry entry(String formId) {

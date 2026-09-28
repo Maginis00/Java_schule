@@ -23,6 +23,8 @@ public final class FormMenuFactory {
     private static final int ITEM_HEIGHT = 30;
     private static final int DROPDOWN_WIDTH = 170;
     private static final double PREVIEW_SIZE = 18;
+    private static final int SETTINGS_OFFSET_X = 110; // Abstand Anker -> Einstellungen-Button (Platz für die Auswahl)
+    private static final int SETTINGS_WIDTH = 110;
 
     private FormMenuFactory() {
     }
@@ -43,7 +45,10 @@ public final class FormMenuFactory {
         Rectangle dropdown = new Rectangle(anchor.x, anchor.y + anchor.height,
                 DROPDOWN_WIDTH, ITEM_HEIGHT * items.size());
 
-        UiMenuState menu = new UiMenuState(anchor, dropdown, items);
+        Rectangle settings = new Rectangle(anchor.x + anchor.width + SETTINGS_OFFSET_X, anchor.y,
+                SETTINGS_WIDTH, ANCHOR_HEIGHT);
+
+        UiMenuState menu = new UiMenuState(anchor, dropdown, settings, items);
         world.setResource(UiMenuState.class, menu);
         world.getResource(SpawnMode.class).setSelectedForm(items.get(menu.getSelectedIndex()).formId);
         return menu;
