@@ -1,10 +1,10 @@
 package com.example.system;
 
-import com.example.Game.KeyState;
 import com.example.component.PlayerTag;
 import com.example.component.Velocity;
 import com.example.ecs.System;
 import com.example.ecs.World;
+import com.example.input.KeyState;
 
 import java.awt.event.KeyEvent;
 

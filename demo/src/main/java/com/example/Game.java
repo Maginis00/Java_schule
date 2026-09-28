@@ -5,15 +5,18 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
-import java.util.Arrays;
 
 import com.example.component.PlayerTag;
 import com.example.component.Renderable;
@@ -21,10 +24,19 @@ import com.example.component.Transform;
 import com.example.component.Velocity;
 import com.example.ecs.Schedule;
 import com.example.ecs.World;
+import com.example.input.KeyState;
+import com.example.input.MouseState;
+import com.example.resource.SpawnMode;
+import com.example.system.ButtonVisualSystem;
 import com.example.system.DebugSystem;
 import com.example.system.InputSystem;
 import com.example.system.MovementSystem;
 import com.example.system.RenderSystem;
+import com.example.system.ShapeRenderSystem;
+import com.example.system.UiInputSystem;
+import com.example.system.UiRenderSystem;
+import com.example.system.WorldInputSystem;
+import com.example.ui.TriangleButtonFactory;
 
 /** Fenster, Canvas, Loop und Keyboard-State; die Spiellogik steckt komplett in den Systems. */
 public class Game {
@@ -43,25 +55,6 @@ public class Game {
     private static final double PLAYER_SIZE = 40;
     private static final Color PLAYER_COLOR = new Color(80, 200, 120);
     private static final Color OBSTACLE_COLOR = new Color(200, 80, 80);
-
-    /** Resource: gedrückte Tasten. Wird vom Canvas-Listener geschrieben, vom InputSystem gelesen. */
-    public static final class KeyState {
-        private final boolean[] keys = new boolean[256];
-
-        public boolean isDown(int keyCode) {
-            return keyCode >= 0 && keyCode < keys.length && keys[keyCode];
-        }
-
-        void set(int keyCode, boolean down) {
-            if (keyCode >= 0 && keyCode < keys.length) {
-                keys[keyCode] = down;
-            }
-        }
-
-        void clear() {
-            Arrays.fill(keys, false);
-        }
-    }
 
     /** Resource: aktuelle Zeichenfläche des Frames plus Debug-Werte für das DebugSystem. */
     public static final class RenderTarget {
@@ -98,6 +91,8 @@ public class Game {
     }
 
     private final KeyState keyState = new KeyState();
+    private final MouseState mouseState = new MouseState();
+    private final SpawnMode spawnMode = new SpawnMode();
     private final RenderTarget renderTarget = new RenderTarget(WIDTH, HEIGHT);
     private final World world = new World();
     private final Schedule schedule = new Schedule();
@@ -123,12 +118,18 @@ public class Game {
     /** Resources, Systems in fester Set-Zuordnung und die Start-Entities anlegen. */
     private void initWorld() {
         world.setResource(KeyState.class, keyState);
+        world.setResource(MouseState.class, mouseState);
+        world.setResource(SpawnMode.class, spawnMode);
         world.setResource(RenderTarget.class, renderTarget);
 
-        // Innerhalb eines Sets gilt die Einfügereihenfolge
-        schedule.inputSet().add(new InputSystem());
-        schedule.updateSet().add(new MovementSystem(WIDTH, HEIGHT));
-        schedule.renderSet().add(new RenderSystem()).add(new DebugSystem());
+        // Sets laufen fest als Input -> Update -> Render, innerhalb eines Sets gilt die Einfügereihenfolge.
+        // Im InputSet zuerst die UI (verbraucht Klicks), zuletzt die Welt (löscht die Klick-Flags).
+        schedule.inputSet().add(new UiInputSystem()).add(new InputSystem()).add(new WorldInputSystem());
+        schedule.updateSet().add(new MovementSystem(WIDTH, HEIGHT)).add(new ButtonVisualSystem());
+        schedule.renderSet().add(new RenderSystem()).add(new ShapeRenderSystem())
+                .add(new UiRenderSystem()).add(new DebugSystem());
+
+        TriangleButtonFactory.create(world);
 
         // Hindernis zuerst, damit der Player (höhere ID) darüber gezeichnet wird
         int obstacle = world.createEntity();
@@ -158,11 +159,47 @@ public class Game {
                 keyState.set(e.getKeyCode(), false);
             }
         });
-        // Bei Fokusverlust alle Tasten loslassen, sonst "klemmt" die Bewegung
+        MouseAdapter mouseListener = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                canvas.requestFocusInWindow();
+                mouseState.setPosition(e.getX(), e.getY());
+                mouseState.press(e.getButton());
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                mouseState.release(e.getButton());
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                mouseState.setPosition(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                mouseState.setPosition(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                mouseState.setInsideWindow(true);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                mouseState.setInsideWindow(false);
+            }
+        };
+        canvas.addMouseListener(mouseListener);
+        canvas.addMouseMotionListener(mouseListener);
+        // Bei Fokusverlust alle Tasten/Maustasten loslassen, sonst "klemmt" die Bewegung
         canvas.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
                 keyState.clear();
+                mouseState.clear();
             }
         });
 
@@ -255,6 +292,10 @@ public class Game {
 
     /** Render-Pfad: nur das RenderSet, zeichnet auf den Graphics des aktuellen Buffers. */
     private void render(Graphics g, double alpha) {
+        // Antialiasing für den ganzen Frame (Formen und Text)
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         renderTarget.graphics = g;
         schedule.render(world, alpha);
         renderTarget.graphics = null;

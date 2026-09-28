@@ -5,9 +5,14 @@ package com.example.ecs;
  * Die Reihenfolge steckt im Code von update()/render(), nicht in den Systemen selbst.
  */
 public class Schedule {
+    private final SystemSet setupSet = new SystemSet("SetupSet");
     private final SystemSet inputSet = new SystemSet("InputSet");
     private final SystemSet updateSet = new SystemSet("UpdateSet");
     private final SystemSet renderSet = new SystemSet("RenderSet");
+
+    public SystemSet setupSet() {
+        return setupSet;
+    }
 
     public SystemSet inputSet() {
         return inputSet;
@@ -19,6 +24,10 @@ public class Schedule {
 
     public SystemSet renderSet() {
         return renderSet;
+    }
+
+    public void init(World world, double fixedDt) {
+        setupSet.run(world, fixedDt);
     }
 
     /** Logik-Pfad: nur Input und Update, wird im festen Zeitschritt aufgerufen. */
