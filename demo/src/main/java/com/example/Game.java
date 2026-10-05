@@ -1,7 +1,6 @@
 package com.example;
 
 import java.awt.Canvas;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
@@ -18,27 +17,28 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
 
-import com.example.component.PlayerTag;
-import com.example.component.Renderable;
-import com.example.component.Transform;
-import com.example.component.Velocity;
 import com.example.ecs.Schedule;
 import com.example.ecs.World;
 import com.example.input.KeyState;
 import com.example.input.MouseState;
+import com.example.resource.DragState;
 import com.example.resource.PropertyDialog;
+import com.example.resource.Recorder;
 import com.example.resource.Selection;
 import com.example.resource.SpawnMode;
 import com.example.system.DebugSystem;
 import com.example.system.DialogRenderSystem;
-import com.example.system.InputSystem;
-import com.example.system.MovementSystem;
+import com.example.system.DragSystem;
+import com.example.system.InputFrameEndSystem;
 import com.example.system.OverlayRenderSystem;
+import com.example.system.RecorderRenderSystem;
+import com.example.system.RecorderSystem;
 import com.example.system.RenderSystem;
 import com.example.system.SelectionHighlightSystem;
 import com.example.system.ShapeRenderSystem;
 import com.example.system.UiDialogInputSystem;
 import com.example.system.UiMenuInputSystem;
+import com.example.system.UiRecorderInputSystem;
 import com.example.system.UiRenderSystem;
 import com.example.system.WorldPickSystem;
 import com.example.system.WorldSpawnSystem;
@@ -57,10 +57,6 @@ public class Game {
     private static final int BUFFER_COUNT = 2;              // Double Buffering
     private static final int BUFFER_STRATEGY_RETRIES = 10;
     private static final long RETRY_DELAY_MS = 10;
-
-    private static final double PLAYER_SIZE = 40;
-    private static final Color PLAYER_COLOR = new Color(80, 200, 120);
-    private static final Color OBSTACLE_COLOR = new Color(200, 80, 80);
 
     /** Resource: aktuelle Zeichenfläche des Frames plus Debug-Werte für das DebugSystem. */
     public static final class RenderTarget {
@@ -121,42 +117,42 @@ public class Game {
         initWindow();
     }
 
-    /** Resources, Systems in fester Set-Zuordnung und die Start-Entities anlegen. */
+    /** Resources und Systems in fester Set-Zuordnung anlegen; die Welt startet leer. */
     private void initWorld() {
         world.setResource(KeyState.class, keyState);
         world.setResource(MouseState.class, mouseState);
         world.setResource(SpawnMode.class, spawnMode);
         world.setResource(Selection.class, new Selection());
+        world.setResource(DragState.class, new DragState());
         world.setResource(PropertyDialog.class, new PropertyDialog());
+        world.setResource(Recorder.class, new Recorder());
         world.setResource(RenderTarget.class, renderTarget);
 
         // Sets laufen fest als Input -> Update -> Render, innerhalb eines Sets gilt die Einfügereihenfolge.
-        // Im InputSet zuerst die UI (Dialog vor Menü, beide verbrauchen Klicks), dann die Welt:
-        // Pick (Selektion) vor Spawn, der die Klick-Flags am Ende löscht. Der Player-Input ist ganz am Ende.
+        // Im InputSet zuerst die UI (Dialog, Aufnahme-Buttons, Menü; alle verbrauchen Klicks), dann die
+        // Welt: Pick (Selektion, greift die Figur) vor Drag vor Spawn. Ganz am Ende werden nicht
+        // verbrauchte Klicks und Tastendrücke verworfen.
         schedule.inputSet()
             .add(new UiDialogInputSystem())
+            .add(new UiRecorderInputSystem())
             .add(new UiMenuInputSystem())
             .add(new WorldPickSystem())
+            .add(new DragSystem())
             .add(new WorldSpawnSystem())
-            .add(new InputSystem());
+            .add(new InputFrameEndSystem());
         schedule.updateSet()
-            .add(new MovementSystem(WIDTH, HEIGHT));
+            .add(new RecorderSystem());
         schedule.renderSet()
             .add(new RenderSystem())
             .add(new ShapeRenderSystem())
             .add(new SelectionHighlightSystem())
             .add(new UiRenderSystem())
+            .add(new RecorderRenderSystem())
             .add(new DialogRenderSystem())
             .add(new OverlayRenderSystem())
             .add(new DebugSystem());
 
         FormMenuFactory.create(world); // legt auch die UiMenuState-Resource an
-
-        int player = world.createEntity();
-        world.add(player, new Transform((WIDTH - PLAYER_SIZE) / 2.0, (HEIGHT - PLAYER_SIZE) / 2.0));
-        world.add(player, new Velocity(0, 0));
-        world.add(player, new Renderable(PLAYER_SIZE, PLAYER_SIZE, PLAYER_COLOR));
-        world.add(player, new PlayerTag());
     }
 
     private void initWindow() {

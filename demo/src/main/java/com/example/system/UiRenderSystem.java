@@ -22,16 +22,17 @@ public class UiRenderSystem implements System {
     private static final String ANCHOR_OPEN = "Form v";
     private static final String SETTINGS_LABEL = "Einstellungen";
 
-    private static final Color ANCHOR_COLOR = new Color(50, 60, 85);
-    private static final Color ANCHOR_HOVER_COLOR = new Color(75, 90, 125);
+    // Button-Farben sind package-private: das RecorderRenderSystem zeichnet seine Buttons im selben Stil
+    static final Color ANCHOR_COLOR = new Color(50, 60, 85);
+    static final Color ANCHOR_HOVER_COLOR = new Color(75, 90, 125);
     private static final Color PANEL_COLOR = new Color(40, 48, 68);
     private static final Color ITEM_HOVER_COLOR = new Color(85, 105, 150);
-    private static final Color BORDER_COLOR = new Color(20, 25, 40);
+    static final Color BORDER_COLOR = new Color(20, 25, 40);
     private static final Color SEPARATOR_COLOR = new Color(70, 80, 105);
-    private static final Color TEXT_COLOR = Color.WHITE;
+    static final Color TEXT_COLOR = Color.WHITE;
     private static final Color ACTIVE_COLOR = new Color(255, 200, 60); // aktives Spawn-Werkzeug
-    private static final Color DISABLED_COLOR = new Color(38, 44, 60);
-    private static final Color DISABLED_TEXT_COLOR = new Color(110, 118, 140);
+    static final Color DISABLED_COLOR = new Color(38, 44, 60);
+    static final Color DISABLED_TEXT_COLOR = new Color(110, 118, 140);
     private static final Color PREVIEW_COLOR = new Color(140, 190, 240);
 
     private static final int TEXT_PADDING = 10;
@@ -133,7 +134,7 @@ public class UiRenderSystem implements System {
     }
 
     /** Baseline, damit der Text im Rechteck vertikal mittig sitzt. */
-    private int baseline(Graphics2D g2, Rectangle r) {
+    static int baseline(Graphics2D g2, Rectangle r) {
         FontMetrics fm = g2.getFontMetrics();
         return r.y + (r.height + fm.getAscent() - fm.getDescent()) / 2;
     }

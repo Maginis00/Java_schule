@@ -8,7 +8,9 @@ import com.example.ecs.World;
 import com.example.figurenadapter.FormFactory;
 import com.example.input.KeyState;
 import com.example.input.MouseState;
+import com.example.resource.DragState;
 import com.example.resource.PropertyDialog;
+import com.example.resource.Recorder;
 import com.example.resource.Selection;
 import com.example.resource.SpawnMode;
 import com.example.resource.UiMenuState;
@@ -22,7 +24,8 @@ import java.util.List;
 /**
  * Selektion und Ebenen-Durchklicken. Läuft nur, wenn Dialog und Menü den Klick nicht schon
  * verbraucht haben. Ein Klick auf eine Figur wird hier verbraucht (auch im Spawn-Modus: Pick
- * schlägt Spawn); nur ein Klick ins Leere bleibt für das WorldSpawnSystem übrig.
+ * schlägt Spawn) und greift sie für das DragSystem; nur ein Klick ins Leere bleibt für das
+ * WorldSpawnSystem übrig.
  */
 public class WorldPickSystem implements System {
     /** Innerhalb dieses Abstands zum letzten Klick zählt ein Klick als "dieselbe Stelle". */
@@ -38,9 +41,10 @@ public class WorldPickSystem implements System {
         SpawnMode spawn = world.getResource(SpawnMode.class);
         UiMenuState menu = world.getResource(UiMenuState.class);
         PropertyDialog dialog = world.getResource(PropertyDialog.class);
+        DragState drag = world.getResource(DragState.class);
 
-        // Dialog offen = weder Pick noch Tastatur-Bearbeitung
-        if (dialog.isOpen()) {
+        // Dialog offen oder Wiedergabe = weder Pick noch Tastatur-Bearbeitung
+        if (dialog.isOpen() || world.getResource(Recorder.class).isPlaying()) {
             return;
         }
 
@@ -82,10 +86,23 @@ public class WorldPickSystem implements System {
         // Sonst (neue Stelle oder nichts selektiert) wird die oberste Figur genommen.
         boolean sameSpot = Math.abs(mx - selection.getLastMouseX()) <= SAME_SPOT_TOLERANCE
                 && Math.abs(my - selection.getLastMouseY()) <= SAME_SPOT_TOLERANCE;
-        int chosenIndex = selectedIndex >= 0 && sameSpot ? (selectedIndex + 1) % hits.size() : 0;
-
-        selection.pick(hits.get(chosenIndex), hits, chosenIndex, mx, my);
+        if (selectedIndex >= 0 && sameSpot && hits.size() > 1) {
+            // Das Blättern passiert erst beim Loslassen ohne Bewegung (DragSystem). Bis dahin ist die
+            // schon selektierte Figur gegriffen, damit ein Drag sie bewegt und nicht die darunter.
+            beginDrag(world, drag, selection.getSelectedId(), mx, my);
+            int nextIndex = (selectedIndex + 1) % hits.size();
+            drag.setPendingCycle(hits.get(nextIndex), hits, nextIndex);
+        } else {
+            selection.pick(hits.get(0), hits, 0, mx, my);
+            beginDrag(world, drag, hits.get(0), mx, my);
+        }
         mouse.consumeLeftClick();
+    }
+
+    /** Offset zwischen Klickpunkt und Figur-Mittelpunkt merken, damit die Figur beim Greifen nicht springt. */
+    private void beginDrag(World world, DragState drag, int id, int mx, int my) {
+        Transform t = world.get(id, Transform.class);
+        drag.begin(id, mx - t.x, my - t.y, mx, my);
     }
 
     /**

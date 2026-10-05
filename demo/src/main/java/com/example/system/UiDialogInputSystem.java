@@ -7,6 +7,7 @@ import com.example.ecs.World;
 import com.example.input.KeyState;
 import com.example.input.MouseState;
 import com.example.resource.PropertyDialog;
+import com.example.resource.Recorder;
 import com.example.resource.Selection;
 import com.example.resource.SpawnMode;
 import com.example.resource.UiMenuState;
@@ -18,7 +19,8 @@ import java.awt.event.KeyEvent;
 /**
  * Läuft als erstes im InputSet. Solange der Dialog offen ist, ist er modal: JEDER Klick wird
  * hier verbraucht (auch neben dem Dialog), weder Menü noch Pick noch Spawn sehen ihn.
- * Bei geschlossenem Dialog öffnet nur die Taste E ihn (Selektion vor Pending-Spawn).
+ * Bei geschlossenem Dialog öffnet nur die Taste E ihn (Selektion vor Pending-Spawn), außer
+ * während der Wiedergabe einer Aufnahme: dann ist die Welt gesperrt.
  */
 public class UiDialogInputSystem implements System {
     private static final float SIZE_STEP = 4f; // Pixel pro Klick auf +/-
@@ -30,7 +32,7 @@ public class UiDialogInputSystem implements System {
 
         if (dialog.isOpen()) {
             handleOpenDialog(world, dialog, keys);
-        } else if (keys.consumePressed(KeyEvent.VK_E)) {
+        } else if (!world.getResource(Recorder.class).isPlaying() && keys.consumePressed(KeyEvent.VK_E)) {
             openForSelectionOrPending(world, dialog);
         }
     }

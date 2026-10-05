@@ -16,8 +16,7 @@ import com.example.ui.ZOrder;
 
 /**
  * Erzeugt im Spawn-Modus eine Figur der gewählten Form, aber NUR ins Leere: Klicks auf Menü,
- * Dialog oder eine vorhandene Figur hat vorher jemand verbraucht. Muss das letzte Maus-System
- * im InputSet sein, weil es am Ende die Klick-Flags löscht.
+ * Dialog, Aufnahme-Buttons oder eine vorhandene Figur hat vorher jemand verbraucht.
  */
 public class WorldSpawnSystem implements System {
     @Override
@@ -31,9 +30,6 @@ public class WorldSpawnSystem implements System {
             spawn(world, spawn, mouse.getX(), mouse.getY());
             mouse.consumeLeftClick();
         }
-
-        // Ende der Maus-Systems im InputSet: offene Klicks verwerfen
-        mouse.endFrame();
     }
 
     private void spawn(World world, SpawnMode spawn, int x, int y) {

@@ -1,5 +1,6 @@
 package com.example.ui;
 
+import com.example.component.Hidden;
 import com.example.component.Layer;
 import com.example.component.ShapeHolder;
 import com.example.component.Style;
@@ -18,10 +19,12 @@ public final class ZOrder {
     private ZOrder() {
     }
 
-    /** Alle Figuren, unterste zuerst. */
+    /** Alle sichtbaren Figuren (ohne Hidden), unterste zuerst. */
     public static List<Integer> bottomToTop(World world) {
         List<Integer> ids = new ArrayList<>();
-        for (int id : world.query(Transform.class, ShapeHolder.class, Style.class, Layer.class)) {
+        Class<?>[] all = { Transform.class, ShapeHolder.class, Style.class, Layer.class };
+        Class<?>[] exclude = { Hidden.class };
+        for (int id : world.query(all, exclude)) {
             ids.add(id);
         }
         ids.sort((a, b) -> {
