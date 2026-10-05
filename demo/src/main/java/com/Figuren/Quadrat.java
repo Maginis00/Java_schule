@@ -34,7 +34,7 @@ public class Quadrat extends Form {
     }
 
     @Override
-    protected Shape erzeugeShape() {
+    public Shape erzeugeShape() {
         return new Rectangle(getXPosition(), getYPosition(), groesse, groesse);
     }
 }

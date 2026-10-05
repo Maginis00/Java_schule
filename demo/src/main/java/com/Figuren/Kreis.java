@@ -34,7 +34,7 @@ public class Kreis extends Form {
     }
 
     @Override
-    protected Shape erzeugeShape() {
+    public Shape erzeugeShape() {
         return new Ellipse2D.Double(getXPosition(), getYPosition(), durchmesser, durchmesser);
     }
 }

@@ -1,30 +1,48 @@
 package com.example;
 
 import java.awt.Canvas;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
-import java.util.Arrays;
 
-import com.example.component.PlayerTag;
-import com.example.component.Renderable;
-import com.example.component.Transform;
-import com.example.component.Velocity;
 import com.example.ecs.Schedule;
 import com.example.ecs.World;
+import com.example.input.KeyState;
+import com.example.input.MouseState;
+import com.example.resource.DragState;
+import com.example.resource.PropertyDialog;
+import com.example.resource.Recorder;
+import com.example.resource.Selection;
+import com.example.resource.SpawnMode;
 import com.example.system.DebugSystem;
-import com.example.system.InputSystem;
-import com.example.system.MovementSystem;
+import com.example.system.DialogRenderSystem;
+import com.example.system.DragSystem;
+import com.example.system.InputFrameEndSystem;
+import com.example.system.OverlayRenderSystem;
+import com.example.system.RecorderRenderSystem;
+import com.example.system.RecorderSystem;
 import com.example.system.RenderSystem;
+import com.example.system.SelectionHighlightSystem;
+import com.example.system.ShapeRenderSystem;
+import com.example.system.UiDialogInputSystem;
+import com.example.system.UiMenuInputSystem;
+import com.example.system.UiRecorderInputSystem;
+import com.example.system.UiRenderSystem;
+import com.example.system.WorldPickSystem;
+import com.example.system.WorldSpawnSystem;
+import com.example.ui.FormMenuFactory;
 
 /** Fenster, Canvas, Loop und Keyboard-State; die Spiellogik steckt komplett in den Systems. */
 public class Game {
@@ -39,29 +57,6 @@ public class Game {
     private static final int BUFFER_COUNT = 2;              // Double Buffering
     private static final int BUFFER_STRATEGY_RETRIES = 10;
     private static final long RETRY_DELAY_MS = 10;
-
-    private static final double PLAYER_SIZE = 40;
-    private static final Color PLAYER_COLOR = new Color(80, 200, 120);
-    private static final Color OBSTACLE_COLOR = new Color(200, 80, 80);
-
-    /** Resource: gedrückte Tasten. Wird vom Canvas-Listener geschrieben, vom InputSystem gelesen. */
-    public static final class KeyState {
-        private final boolean[] keys = new boolean[256];
-
-        public boolean isDown(int keyCode) {
-            return keyCode >= 0 && keyCode < keys.length && keys[keyCode];
-        }
-
-        void set(int keyCode, boolean down) {
-            if (keyCode >= 0 && keyCode < keys.length) {
-                keys[keyCode] = down;
-            }
-        }
-
-        void clear() {
-            Arrays.fill(keys, false);
-        }
-    }
 
     /** Resource: aktuelle Zeichenfläche des Frames plus Debug-Werte für das DebugSystem. */
     public static final class RenderTarget {
@@ -98,6 +93,8 @@ public class Game {
     }
 
     private final KeyState keyState = new KeyState();
+    private final MouseState mouseState = new MouseState();
+    private final SpawnMode spawnMode = new SpawnMode();
     private final RenderTarget renderTarget = new RenderTarget(WIDTH, HEIGHT);
     private final World world = new World();
     private final Schedule schedule = new Schedule();
@@ -120,26 +117,42 @@ public class Game {
         initWindow();
     }
 
-    /** Resources, Systems in fester Set-Zuordnung und die Start-Entities anlegen. */
+    /** Resources und Systems in fester Set-Zuordnung anlegen; die Welt startet leer. */
     private void initWorld() {
         world.setResource(KeyState.class, keyState);
+        world.setResource(MouseState.class, mouseState);
+        world.setResource(SpawnMode.class, spawnMode);
+        world.setResource(Selection.class, new Selection());
+        world.setResource(DragState.class, new DragState());
+        world.setResource(PropertyDialog.class, new PropertyDialog());
+        world.setResource(Recorder.class, new Recorder());
         world.setResource(RenderTarget.class, renderTarget);
 
-        // Innerhalb eines Sets gilt die Einfügereihenfolge
-        schedule.inputSet().add(new InputSystem());
-        schedule.updateSet().add(new MovementSystem(WIDTH, HEIGHT));
-        schedule.renderSet().add(new RenderSystem()).add(new DebugSystem());
+        // Sets laufen fest als Input -> Update -> Render, innerhalb eines Sets gilt die Einfügereihenfolge.
+        // Im InputSet zuerst die UI (Dialog, Aufnahme-Buttons, Menü; alle verbrauchen Klicks), dann die
+        // Welt: Pick (Selektion, greift die Figur) vor Drag vor Spawn. Ganz am Ende werden nicht
+        // verbrauchte Klicks und Tastendrücke verworfen.
+        schedule.inputSet()
+            .add(new UiDialogInputSystem())
+            .add(new UiRecorderInputSystem())
+            .add(new UiMenuInputSystem())
+            .add(new WorldPickSystem())
+            .add(new DragSystem())
+            .add(new WorldSpawnSystem())
+            .add(new InputFrameEndSystem());
+        schedule.updateSet()
+            .add(new RecorderSystem());
+        schedule.renderSet()
+            .add(new RenderSystem())
+            .add(new ShapeRenderSystem())
+            .add(new SelectionHighlightSystem())
+            .add(new UiRenderSystem())
+            .add(new RecorderRenderSystem())
+            .add(new DialogRenderSystem())
+            .add(new OverlayRenderSystem())
+            .add(new DebugSystem());
 
-        // Hindernis zuerst, damit der Player (höhere ID) darüber gezeichnet wird
-        int obstacle = world.createEntity();
-        world.add(obstacle, new Transform(500, 200));
-        world.add(obstacle, new Renderable(120, 120, OBSTACLE_COLOR));
-
-        int player = world.createEntity();
-        world.add(player, new Transform((WIDTH - PLAYER_SIZE) / 2.0, (HEIGHT - PLAYER_SIZE) / 2.0));
-        world.add(player, new Velocity(0, 0));
-        world.add(player, new Renderable(PLAYER_SIZE, PLAYER_SIZE, PLAYER_COLOR));
-        world.add(player, new PlayerTag());
+        FormMenuFactory.create(world); // legt auch die UiMenuState-Resource an
     }
 
     private void initWindow() {
@@ -158,11 +171,47 @@ public class Game {
                 keyState.set(e.getKeyCode(), false);
             }
         });
-        // Bei Fokusverlust alle Tasten loslassen, sonst "klemmt" die Bewegung
+        MouseAdapter mouseListener = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                canvas.requestFocusInWindow();
+                mouseState.setPosition(e.getX(), e.getY());
+                mouseState.press(e.getButton(), e.getClickCount());
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                mouseState.release(e.getButton());
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                mouseState.setPosition(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                mouseState.setPosition(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                mouseState.setInsideWindow(true);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                mouseState.setInsideWindow(false);
+            }
+        };
+        canvas.addMouseListener(mouseListener);
+        canvas.addMouseMotionListener(mouseListener);
+        // Bei Fokusverlust alle Tasten/Maustasten loslassen, sonst "klemmt" die Bewegung
         canvas.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
                 keyState.clear();
+                mouseState.clear();
             }
         });
 
@@ -255,6 +304,10 @@ public class Game {
 
     /** Render-Pfad: nur das RenderSet, zeichnet auf den Graphics des aktuellen Buffers. */
     private void render(Graphics g, double alpha) {
+        // Antialiasing für den ganzen Frame (Formen und Text)
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         renderTarget.graphics = g;
         schedule.render(world, alpha);
         renderTarget.graphics = null;

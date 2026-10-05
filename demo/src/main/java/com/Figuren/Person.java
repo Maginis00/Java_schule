@@ -37,7 +37,7 @@ public class Person extends Form {
     }
 
     @Override
-    protected Shape erzeugeShape() {
+    public Shape erzeugeShape() {
         int bh = (int) (hoehe * 0.7); // Körpergröße
         int hh = (hoehe - bh) / 2; // halbe Kopfgröße
         int hw = breite / 2; // halbe Breite

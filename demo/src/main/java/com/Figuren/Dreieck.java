@@ -36,7 +36,7 @@ public class Dreieck extends Form {
     }
 
     @Override
-    protected Shape erzeugeShape() {
+    public Shape erzeugeShape() {
         int x = getXPosition();
         int y = getYPosition();
         int[] xpoints = { x, x + (breite / 2), x - (breite / 2) };

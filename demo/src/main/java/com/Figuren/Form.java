@@ -143,7 +143,7 @@ public abstract class Form {
     /**
      * Liefert die konkrete AWT-Geometrie dieser Figur.
      */
-    protected abstract Shape erzeugeShape();
+    public abstract Shape erzeugeShape();
 
     protected int getXPosition() {
         return xPosition;
